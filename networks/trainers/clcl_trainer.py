@@ -37,8 +37,8 @@ class CLCLSA_Trainer(object):
         self.labels_tr_tensor = torch.LongTensor(self.labels_trte[self.trte_idx["tr"]])
         num_class = len(np.unique(self.labels_trte))
         self.onehot_labels_tr_tensor = one_hot_tensor(self.labels_tr_tensor, num_class)
-        self.labels_tr_tensor = self.labels_tr_tensor.cuda()
-        self.onehot_labels_tr_tensor = self.onehot_labels_tr_tensor.cuda()
+        self.labels_tr_tensor = self.labels_tr_tensor.cpu()
+        self.onehot_labels_tr_tensor = self.onehot_labels_tr_tensor.cpu()
         dim_list = [x.shape[1] for x in self.data_tr_list]
         self.dim_list = dim_list
         self.num_class = num_class
@@ -69,7 +69,7 @@ class CLCLSA_Trainer(object):
         with open(os.path.join(exp_name, 'config.json'), 'w') as fp:
             json.dump(self.params, fp, indent=4)
 
-        self.model.cuda()
+        self.model.cpu()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.params['lr'], weight_decay=1e-4)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.params['step_size'], gamma=0.2)
         global_acc = 0.

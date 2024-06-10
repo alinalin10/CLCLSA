@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--step_size', type=int, default=500)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--prediction', type=str, default="64,32")
-    parser.add_argument('--device', type=str, default="cuda")
+    parser.add_argument('--device', type=str, default="cpu") # changed to cpu
 
     parser.add_argument('--lambda_cl', type=float, default=0.05)
     parser.add_argument('--lambda_co', type=float, default=0.02)
@@ -36,4 +36,4 @@ if __name__ == '__main__':
     params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
     cl_trainer = CLCLSA_Trainer(params)
-    cl_trainer.train()
+    cl_trainer.train() 
