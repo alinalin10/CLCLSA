@@ -62,6 +62,7 @@ def prepare_trte_data_with_modalities(data_folder, cpu, modalities):
     labels = np.concatenate((labels_tr, labels_te))
     return data_train_list, data_test_list, idx_dict, labels
 
+# check here for views
 def prepare_trte_data(data_folder, cpu):
     num_view = 3
     labels_tr = np.loadtxt(os.path.join(data_folder, "labels_tr.csv"), delimiter=',')
@@ -115,8 +116,8 @@ def one_hot_tensor(y, num_dim):
     y_onehot = torch.zeros(y.shape[0], num_dim)
     y_onehot.scatter_(1, y.view(-1,1), 1)
     return y_onehot
-
-
+ 
+# maybe use this to get views
 def get_mask(view_num, alldata_len, missing_rate):
     """
     Randomly generate incomplete data information, simulate partial view data with complete view data

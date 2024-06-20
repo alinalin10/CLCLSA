@@ -33,8 +33,8 @@ class CLUECL3(nn.Module):
             self.MMClasifier.append(LinearLayer(self.views * hidden_dim[-1], num_class))  # [views*hidden, num_class]
         self.MMClasifier = nn.Sequential(*self.MMClasifier)
 
-        # new code
-        '''
+        # inserted code
+        
         def KL(alpha, c):
             beta = torch.ones((1, c)).cpu()
             S_alpha = torch.sum(alpha, dim=1, keepdim=True)
@@ -59,8 +59,8 @@ class CLUECL3(nn.Module):
             B = annealing_coef * KL(alp, c)
 
             return (A + B)
-        '''
-        # self.criterion = 
+        
+        # TODO
         self.criterion = torch.nn.CrossEntropyLoss(reduction='none') 
 
         # CLUE
