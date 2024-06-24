@@ -10,9 +10,11 @@ from networks.models.losses import contrastive_Loss
 class CLUECL3(nn.Module):
     def __init__(self, in_dim, hidden_dim, num_class, dropout, prediction_dicts):
         super().__init__()
-        assert(len(in_dim)) == 3
+        # assert(len(in_dim)) == 3
+        assert(len(in_dim)) == 2
         self.in_dim = in_dim
-        self.views = 3  # views = 3, in_dim = [1000, 503, 1000]
+        # self.views = 3   views = 3, in_dim = [1000, 503, 1000]
+        self.views = 2
         self.classes = num_class
         self.hidden_dim = hidden_dim
         self.dropout = dropout
@@ -60,7 +62,7 @@ class CLUECL3(nn.Module):
 
             return (A + B)
         
-        # TODO
+        # TODO change loss function
         self.criterion = torch.nn.CrossEntropyLoss(reduction='none') 
 
         # CLUE
@@ -114,12 +116,15 @@ class CLUECL3(nn.Module):
                          cross_omics_loss=False, lambda_col=0.05,
                          constrastive_loss=False, lambda_cl=0.05):
         # select the complete samples
-        x1_train, x2_train, x3_train = data_list
+        # x1_train, x2_train, x3_train = data_list
+        x1_train, x2_train = data_list
         flag = torch.LongTensor([1, 1, 1]).to(device)
         flag = (mask == flag).int()
         flag = ((flag[:, 1] + flag[:, 0] + flag[:, 2]) == 3)
-        train_view1, train_view2, train_view3 = x1_train[flag], x2_train[flag], x3_train[flag]
-        data_list = [train_view1, train_view2, train_view3]
+        # train_view1, train_view2, train_view3 = x1_train[flag], x2_train[flag], x3_train[flag]
+        train_view1, train_view2 = x1_train[flag], x2_train[flag]
+        # data_list = [train_view1, train_view2, train_view3]
+        data_list = [train_view1, train_view2]
         label = label[flag]
 
         # perform feature embedding
@@ -159,25 +164,27 @@ class CLUECL3(nn.Module):
             a2c, _ = self.a2c(feat_emb[0])
             b2a, _ = self.b2a(feat_emb[1])
             b2c, _ = self.b2c(feat_emb[1])
-            c2a, _ = self.c2a(feat_emb[2])
-            c2b, _ = self.c2b(feat_emb[2])
+            # c2a, _ = self.c2a(feat_emb[2])
+            # c2b, _ = self.c2b(feat_emb[2])
             pre1 = F.mse_loss(a2b, feat_emb[1])
             pre2 = F.mse_loss(b2a, feat_emb[0])
-            pre3 = F.mse_loss(a2c, feat_emb[2])
-            pre4 = F.mse_loss(c2a, feat_emb[0])
-            pre5 = F.mse_loss(b2c, feat_emb[2])
-            pre6 = F.mse_loss(c2b, feat_emb[1])
+            # pre3 = F.mse_loss(a2c, feat_emb[2])
+            # pre4 = F.mse_loss(c2a, feat_emb[0])
+            # pre5 = F.mse_loss(b2c, feat_emb[2])
+            # pre6 = F.mse_loss(c2b, feat_emb[1])
 
-            loss_co = lambda_col * (pre1 + pre2 + pre3 + pre4 + pre5 + pre6)
+            # loss_co = lambda_col * (pre1 + pre2 + pre3 + pre4 + pre5 + pre6)
+            loss_co = lambda_col * (pre1 + pre2)
             MMLoss = MMLoss +  loss_co
             loss_dict['col'] = round(loss_co.item(), 4)
 
         if constrastive_loss:
             loss_cil_ab = contrastive_Loss(feat_emb[0], feat_emb[1], lambda_cl)
-            loss_cil_ac = contrastive_Loss(feat_emb[0], feat_emb[2], lambda_cl)
-            loss_cil_bc = contrastive_Loss(feat_emb[1], feat_emb[2], lambda_cl)
+            # loss_cil_ac = contrastive_Loss(feat_emb[0], feat_emb[2], lambda_cl)
+            # loss_cil_bc = contrastive_Loss(feat_emb[1], feat_emb[2], lambda_cl)
             # loss_cil_ab = InfoNceDist()
-            loss_cil = lambda_cl * (loss_cil_ab + loss_cil_ac + loss_cil_bc)
+            # loss_cil = lambda_cl * (loss_cil_ab + loss_cil_ac + loss_cil_bc)
+            loss_cil = lambda_cl * (loss_cil_ab)
             MMLoss = MMLoss + loss_cil
             loss_dict['cil'] = round(loss_cil.item(), 4)
 
@@ -198,7 +205,8 @@ class CLUECL3(nn.Module):
 
     def infer_on_missing(self, data_list, mask, device):
         # make sure eval all modules before
-        x1_train, x2_train, x3_train = data_list
+        # x1_train, x2_train, x3_train = data_list
+        x1_train, x2_train = data_list
         a_idx_eval = mask[:, 0] == 1
         b_idx_eval = mask[:, 1] == 1
         c_idx_eval = mask[:, 2] == 1
@@ -209,12 +217,12 @@ class CLUECL3(nn.Module):
         # latent_code_x_eval, store information
         latent_code_a_eval = torch.zeros(x1_train.shape[0], self.hidden_dim[-1]).to(device)
         latent_code_b_eval = torch.zeros(x2_train.shape[0], self.hidden_dim[-1]).to(device)
-        latent_code_c_eval = torch.zeros(x3_train.shape[0], self.hidden_dim[-1]).to(device)
+        # latent_code_c_eval = torch.zeros(x3_train.shape[0], self.hidden_dim[-1]).to(device)
 
         # predict on each omics without missing
         a_latent_eval = self.encode(x1_train[a_idx_eval], self.att[0], self.emb[0], self.aux_conf[0])
         b_latent_eval = self.encode(x2_train[b_idx_eval], self.att[1], self.emb[1], self.aux_conf[1])
-        c_latent_eval = self.encode(x3_train[c_idx_eval], self.att[2], self.emb[2], self.aux_conf[2])
+        # c_latent_eval = self.encode(x3_train[c_idx_eval], self.att[2], self.emb[2], self.aux_conf[2])
 
         if a_missing_idx_eval.sum() != 0:
             ano_bonlyhas_idx = a_missing_idx_eval * b_idx_eval * ~c_idx_eval
@@ -224,16 +232,16 @@ class CLUECL3(nn.Module):
             ano_bonlyhas = self.encode(x2_train[ano_bonlyhas_idx], self.att[1], self.emb[1], self.aux_conf[1])
             ano_bonlyhas, _ = self.b2a(ano_bonlyhas)
                            
-            ano_conlyhas = self.encode(x3_train[ano_conlyhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
-            ano_conlyhas, _ = self.c2a(ano_conlyhas)
+            # ano_conlyhas = self.encode(x3_train[ano_conlyhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
+            # ano_conlyhas, _ = self.c2a(ano_conlyhas) 
 
             ano_bcbothhas_1 = self.encode(x2_train[ano_bcbothhas_idx], self.att[1], self.emb[1], self.aux_conf[1])
-            ano_bcbothhas_2 = self.encode(x3_train[ano_bcbothhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
-            ano_bcbothhas = (self.b2a(ano_bcbothhas_1)[0] + self.c2a(ano_bcbothhas_2)[0]) / 2.0
+            # ano_bcbothhas_2 = self.encode(x3_train[ano_bcbothhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
+            # ano_bcbothhas = (self.b2a(ano_bcbothhas_1)[0] + self.c2a(ano_bcbothhas_2)[0]) / 2.0
 
             latent_code_a_eval[ano_bonlyhas_idx] = ano_bonlyhas
-            latent_code_a_eval[ano_conlyhas_idx] = ano_conlyhas
-            latent_code_a_eval[ano_bcbothhas_idx] = ano_bcbothhas
+            # latent_code_a_eval[ano_conlyhas_idx] = ano_conlyhas
+            # latent_code_a_eval[ano_bcbothhas_idx] = ano_bcbothhas
         
         if b_missing_idx_eval.sum() != 0:
             bno_aonlyhas_idx = b_missing_idx_eval * a_idx_eval * ~c_idx_eval
@@ -243,16 +251,16 @@ class CLUECL3(nn.Module):
             bno_aonlyhas = self.encode(x1_train[bno_aonlyhas_idx], self.att[0], self.emb[0], self.aux_conf[0])
             bno_aonlyhas, _ = self.a2b(bno_aonlyhas)
 
-            bno_conlyhas = self.encode(x3_train[bno_conlyhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
-            bno_conlyhas, _ = self.c2b(bno_conlyhas)
+            # bno_conlyhas = self.encode(x3_train[bno_conlyhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
+            # bno_conlyhas, _ = self.c2b(bno_conlyhas)
 
             bno_acbothhas_1 = self.encode(x1_train[bno_acbothhas_idx], self.att[0], self.emb[0], self.aux_conf[0])
-            bno_acbothhas_2 = self.encode(x3_train[bno_acbothhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
-            bno_acbothhas = (self.a2b(bno_acbothhas_1)[0] + self.c2b(bno_acbothhas_2)[0]) / 2.0
+            # bno_acbothhas_2 = self.encode(x3_train[bno_acbothhas_idx], self.att[2], self.emb[2], self.aux_conf[2])
+            # bno_acbothhas = (self.a2b(bno_acbothhas_1)[0] + self.c2b(bno_acbothhas_2)[0]) / 2.0
 
             latent_code_b_eval[bno_aonlyhas_idx] = bno_aonlyhas
-            latent_code_b_eval[bno_conlyhas_idx] = bno_conlyhas
-            latent_code_b_eval[bno_acbothhas_idx] = bno_acbothhas
+            # latent_code_b_eval[bno_conlyhas_idx] = bno_conlyhas
+            # latent_code_b_eval[bno_acbothhas_idx] = bno_acbothhas
 
         if c_missing_idx_eval.sum() != 0:
             cno_aonlyhas_idx = c_missing_idx_eval * a_idx_eval * ~b_idx_eval
@@ -269,14 +277,15 @@ class CLUECL3(nn.Module):
             cno_abbothhas_2 = self.encode(x2_train[cno_abbothhas_idx], self.att[1], self.emb[1], self.aux_conf[1])
             cno_abbothhas = (self.a2c(cno_abbothhas_1)[0] + self.b2c(cno_abbothhas_2)[0]) / 2.0
 
-            latent_code_c_eval[cno_aonlyhas_idx] = cno_aonlyhas
-            latent_code_c_eval[cno_bonlyhas_idx] = cno_bonlyhas
-            latent_code_c_eval[cno_abbothhas_idx] = cno_abbothhas
+            # latent_code_c_eval[cno_aonlyhas_idx] = cno_aonlyhas
+            # latent_code_c_eval[cno_bonlyhas_idx] = cno_bonlyhas
+            # latent_code_c_eval[cno_abbothhas_idx] = cno_abbothhas
 
         latent_code_a_eval[a_idx_eval] = a_latent_eval
         latent_code_b_eval[b_idx_eval] = b_latent_eval
-        latent_code_c_eval[c_idx_eval] = c_latent_eval
+        # latent_code_c_eval[c_idx_eval] = c_latent_eval
 
-        latent_fusion_train = torch.cat([latent_code_a_eval, latent_code_b_eval, latent_code_c_eval], dim=1)
+        # latent_fusion_train = torch.cat([latent_code_a_eval, latent_code_b_eval, latent_code_c_eval], dim=1)
+        latent_fusion_train = torch.cat([latent_code_a_eval, latent_code_b_eval], dim=1)
         MMlogit = self.MMClasifier(latent_fusion_train)
         return MMlogit

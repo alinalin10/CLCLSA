@@ -1,0 +1,31 @@
+{
+    "data_folder": "LGG",
+    "missing_rate": 0.2,
+    "exp": "./exp",
+    "hidden_dim": [
+        300
+    ],
+    "lr": 0.0001,
+    "step_size": 500,
+    "dropout": 0.5,
+    "prediction": {
+        "0": [
+            64,
+            32
+        ],
+        "1": [
+            64,
+            32
+        ],
+        "2": [
+            64,
+            32
+        ]
+    },
+    "device": "cpu",
+    "lambda_cl": 0.05,
+    "lambda_co": 0.02,
+    "lambda_al": 1.0,
+    "num_epoch": 2500,
+    "test_inverval": 50
+}

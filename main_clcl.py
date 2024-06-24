@@ -36,4 +36,4 @@ if __name__ == '__main__':
     params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
     cl_trainer = CLCLSA_Trainer(params)
-    cl_trainer.train() 
+    cl_trainer.train()

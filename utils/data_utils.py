@@ -4,7 +4,8 @@ import numpy as np
 from numpy.random import randint
 from sklearn.preprocessing import OneHotEncoder
 
-
+# data w modalities (USE THIS)
+# for modalities: pick 2 of the modalities and put them as strings in an array
 def prepare_trte_data_with_modalities(data_folder, cpu, modalities):
     num_view = len(modalities)
     labels_tr = np.loadtxt(os.path.join(data_folder, "labels_tr.csv"), delimiter=',')

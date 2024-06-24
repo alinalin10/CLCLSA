@@ -7,7 +7,10 @@ import numpy as np
 import pprint
 
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from utils.data_utils import one_hot_tensor, prepare_trte_data, get_mask
+# TODO whats the difference??
+ 
+ 
+from utils.data_utils import one_hot_tensor, prepare_trte_data, get_mask, prepare_trte_data_with_modalities
 from networks.models.clcl import CLUECL3
 from datetime import datetime
 from tqdm import tqdm
@@ -50,7 +53,11 @@ class CLCLSA_Trainer(object):
 
 
     def __init_dataset__(self):
-        self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data(self.params['data_folder'], True)
+
+        # self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data(self.params['data_folder'], True)
+
+        # changed to use only 2 modalities
+        self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data_with_modalities(self.params['data_folder'], True, ['mrna', 'methy'])
         self.labels_tr_tensor = torch.LongTensor(self.labels_trte[self.trte_idx["tr"]])
         num_class = len(np.unique(self.labels_trte))
         self.onehot_labels_tr_tensor = one_hot_tensor(self.labels_tr_tensor, num_class)
@@ -66,17 +73,22 @@ class CLCLSA_Trainer(object):
             mask = torch.from_numpy(np.asarray(mask, dtype=np.float32)).to(self.device)
             x1_train = self.data_tr_list[0] * torch.unsqueeze(mask[:, 0], 1)
             x2_train = self.data_tr_list[1] * torch.unsqueeze(mask[:, 1], 1)
-            x3_train = self.data_tr_list[2] * torch.unsqueeze(mask[:, 2], 1)
+            # commented out to only use 2 modalities
+            # x3_train = self.data_tr_list[2] * torch.unsqueeze(mask[:, 2], 1)
+            
             self.mask_train = mask
-            self.data_tr_list = [x1_train, x2_train, x3_train]
+            # self.data_tr_list = [x1_train, x2_train, x3_train]
+            self.data_tr_list = [x1_train, x2_train]
             #mask = get_mask(3, self.data_test_list[0].shape[0], self.params['missing_rate'])
             mask = get_mask_wrapper(3, self.data_test_list[0].shape[0], self.params['missing_rate'])
             mask = torch.from_numpy(np.asarray(mask, dtype=np.float32)).to(self.device)
             x1_test = self.data_test_list[0] * torch.unsqueeze(mask[:, 0], 1)
             x2_test = self.data_test_list[1] * torch.unsqueeze(mask[:, 1], 1)
-            x3_test = self.data_test_list[2] * torch.unsqueeze(mask[:, 2], 1)
+            # commented out to only use 2 modalities
+            # x3_test = self.data_test_list[2] * torch.unsqueeze(mask[:, 2], 1)
             self.mask_test = mask
-            self.data_test_list = [x1_test, x2_test, x3_test]
+            # self.data_test_list = [x1_test, x2_test, x3_test]
+            self.data_test_list = [x1_test, x2_test]
     
     # new DS_Combin from TMC
     def DS_Combin(self, alpha):
@@ -158,12 +170,12 @@ class CLCLSA_Trainer(object):
 
             self.scheduler.step()
             if epoch % self.params['test_inverval'] == 0:
-                te_prob = self.test_epoch()
+                te_prob, alpha_a, u_a = self.test_epoch()
                 if not np.any(np.isnan(te_prob)):
                     print("\nTest: Epoch {:d}".format(epoch))
                     if self.num_class == 2:
                         # uncertainty
-                        u_a = "work in progress"
+                        # u_a = "work in progress"
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
@@ -209,7 +221,9 @@ class CLCLSA_Trainer(object):
                 logit = self.model.infer_on_missing(self.data_test_list, self.mask_test, self.device)
             else:
                 logit = self.model.infer(self.data_test_list)
+            # softmax converts raw output scores to probabilities
             prob = F.softmax(logit, dim=1).data.cpu().numpy()
+            
         
         # new: setting alpha to evidence
         evidence = self.infer_evidence(self.data_test_list)
@@ -224,7 +238,7 @@ class CLCLSA_Trainer(object):
         # u_a is len = 153
         # TODO figure out what this represents
 
-        return prob
+        return prob, alpha_a, u_a
 
     def save_checkpoint(self, checkpoint_path, filename="checkpoint.pt"):
         os.makedirs(checkpoint_path, exist_ok=True)
