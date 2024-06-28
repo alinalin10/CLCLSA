@@ -5,15 +5,21 @@ import torch.nn.functional as F
 import os
 import numpy as np
 import pprint
+import matplotlib.pyplot as plt
 
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, confusion_matrix
 # TODO whats the difference??
  
  
 from utils.data_utils import one_hot_tensor, prepare_trte_data, get_mask, prepare_trte_data_with_modalities
-from networks.models.clcl import CLUECL3
+from networks.models.clcl import CLUECL3, Classifier, EV_SV, SingleViewData
 from datetime import datetime
 from tqdm import tqdm
+
+import torch.optim as optim
+from torch.autograd import Variable
+import pandas as pd
+
 
 
 def get_mask_wrapper(n_views, data_len, missing_rate):
@@ -67,6 +73,10 @@ class CLCLSA_Trainer(object):
         self.dim_list = dim_list
         self.num_class = num_class
         print("[x] number of num_class = ", self.num_class)
+
+        # arrays for u_a and accuracy to plot
+        # self.uncertainty_arr = []
+        # self.auc_arr = []
 
         if self.params['missing_rate'] > 0.:
             mask = get_mask(3, self.data_tr_list[0].shape[0], self.params['missing_rate'])
@@ -174,12 +184,23 @@ class CLCLSA_Trainer(object):
                 if not np.any(np.isnan(te_prob)):
                     print("\nTest: Epoch {:d}".format(epoch))
                     if self.num_class == 2:
-                        # uncertainty
-                        # u_a = "work in progress"
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
-                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty: {u_a}")
+                        # took out uncertainty bc it takes alot of space to print
+                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty:")
+                        
+                        # put uncertainty values into an array instantiated in the constructor
+                        # unraveled = u_a.ravel()
+                        # mean_u_a = torch.mean(unraveled)
+                        # print(mean_u_a)
+                        # self.uncertainty_arr.append(mean_u_a)
+                        # fix mean_u_a (try checking if the full u_a is the same everytime too)
+                        # SOLVED: doing something else
+                        # put auc values into an array
+                        # self.auc_arr.append(auc)
+                        # print(self.auc_arr)
+                        
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
@@ -260,20 +281,108 @@ class CLCLSA_Trainer(object):
         for v_num in range(views):
             evidence[v_num] = self.Classifiers[v_num](input[v_num])
         return evidence 
-    
-class Classifier(nn.Module):
-    def __init__(self, classifier_dims, num_class):
-        super(Classifier, self).__init__()
-        self.num_layers = len(classifier_dims)
-        self.fc = nn.ModuleList()
-        for i in range(self.num_layers-1):
-            self.fc.append(nn.Linear(classifier_dims[i], classifier_dims[i+1]))
-        self.fc.append(nn.Linear(classifier_dims[self.num_layers-1], num_class))
-        self.fc.append(nn.Softplus())
 
+    # TODO plot
+    def plot(self):
+        print("working")
+        
 
-    def forward(self, x):
-        h = self.fc[0](x)
-        for i in range(1, len(self.fc)):
-            h = self.fc[i](h)
-        return h
+# TODO optimize EV_Trainer
+class EV_Trainer:
+    def __init__(self, params):
+        self.params = params
+        # load training data and testing data
+        # df_train = pd.read_csv(f"{self.params.data_path}/view1_train_x0.csv").to_numpy()
+        # df_test = pd.read_csv(f"{self.params.data_path}/view1_test_x0.csv").to_numpy()
+
+        # attempt to read clclsa files instead
+        df_train = pd.read_csv(f"{self.params.data_path}/1_tr.csv").to_numpy()
+        df_test = pd.read_csv(f"{self.params.data_path}/1_te.csv").to_numpy()
+
+        batch_size = df_train.shape[0] if self.params.batch_size == -1 else self.params.batch_size
+        # self.train_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=True, cv=self.params.cv), batch_size=batch_size, shuffle=True)
+        # self.test_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=False, cv=self.params.cv), batch_size=df_test.shape[0], shuffle=False)
+        
+        # set cv to 0 bc i dont have x4 files, only have x0
+        self.train_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=True, cv=0), batch_size=batch_size, shuffle=True)
+        self.test_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=False, cv=0), batch_size=df_test.shape[0], shuffle=False)
+
+        # TODO issue
+        self.model = EV_SV(2, [200, 244], use_uncertainty=True, loss='digamma')
+        print((list(self.model.children())))
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.params.lr, weight_decay=1e-5)
+        self.model.cpu()
+
+    # SOLVED matrix multiplication error (611x1000 and 11x64) 
+    def train_one_epoch(self, epoch):
+        self.model.train()
+        for batch_idx, (data, target) in enumerate(self.train_loader):
+            data = Variable(data.cpu())
+            target = Variable(target.long().cpu())
+            # refresh the optimizer
+            self.optimizer.zero_grad()
+            
+            # ISSUE
+            outputs, loss, u = self.model(data, target, epoch)
+            # compute gradients and take step
+            loss.backward()
+            self.optimizer.step()
+            if epoch % 50 == 0:
+                print(f"[x] training, @ {epoch}, batch @ {batch_idx}, loss = {loss.item()}")
+
+    def test(self, epoch):
+        self.model.eval()
+        correct_num = 0
+        preds, gts, us = [], [], []
+        for batch_idx, (data, target) in enumerate(self.test_loader):
+            data = Variable(data.cpu())
+            with torch.no_grad():
+                target = Variable(target.long().cpu())
+                outputs, loss, u = self.model(data, target, epoch)
+                _, predicted = torch.max(outputs, 1)
+                correct_num += (predicted == target).sum().item()
+
+                gt = target.cpu().detach().numpy().tolist()
+                predicted = predicted.cpu().detach().numpy().tolist()
+                preds.extend(predicted)
+                gts.extend(gt)
+                us.extend(np.squeeze(u.cpu().detach().numpy()).tolist())
+
+        # labels = [0, 1, 2, 3, 4]
+        # tn: true negative, fp: false positive, fn: false negative, tp: true positives
+        tn, fp, fn, tp = confusion_matrix(gts, predicted).ravel()
+        res = confusion_matrix(gts, predicted)
+        print(res)
+        auc = roc_auc_score(gts, predicted)
+        sen = tp / (tp + fn) 
+        spec = tn / (tn + fp)
+        f1 = 2 * tp / (2 * tp + fp + fn)
+        acc = (tp + tn) / (tp + tn + fp + fn)
+
+        print(f"epoch = {epoch}, AUC: {auc:0.4f}, Sen: {sen:0.4f}, Spe: {spec:0.4f}, F1: {f1:0.4f}, Acc: {acc:0.4f}")
+        return auc, sen, spec, f1, acc, preds, gts, us
+        return res
+
+ 
+    def train(self):
+
+        global_auc = 0.
+        for epoch in tqdm(range(self.params.epochs)):
+            self.train_one_epoch(epoch)
+
+            if epoch % self.params.epochs_val == 0:
+                auc, sen, spec, f1, acc, preds, gts, us = self.test(epoch)
+                if auc > global_auc:
+                    global_auc = auc
+                    self.save_model()
+
+    def save_model(self):
+        if not os.path.isdir(self.params.exp_save_path):
+            os.makedirs(self.params.exp_save_path)
+        # torch.save(self.model.state_dict(), f'{self.params.exp_save_path}/model_sv_cv{self.params.cv}.pth')
+        torch.save(self.model.state_dict(), f'{self.params.exp_save_path}/model_sv_cv4.pth')
+
+    def load_model(self):
+        # self.model.load_state_dict(torch.load(f'{self.params.exp_save_path}/model_sv_cv{self.params.cv}.pth')) 
+        self.model.load_state_dict(torch.load(f'{self.params.exp_save_path}/model_sv_cv4.pth')) 
+

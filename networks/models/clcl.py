@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import numpy as np
-
+import pandas as pd
+from torch.utils.data import Dataset
 from networks.models.common_layers import LinearLayer, Prediction
-from networks.models.losses import contrastive_Loss
+from networks.models.losses import contrastive_Loss, edl_digamma_loss, relu_evidence
 
 class CLUECL3(nn.Module):
     def __init__(self, in_dim, hidden_dim, num_class, dropout, prediction_dicts):
@@ -35,32 +36,6 @@ class CLUECL3(nn.Module):
             self.MMClasifier.append(LinearLayer(self.views * hidden_dim[-1], num_class))  # [views*hidden, num_class]
         self.MMClasifier = nn.Sequential(*self.MMClasifier)
 
-        # inserted code
-        
-        def KL(alpha, c):
-            beta = torch.ones((1, c)).cpu()
-            S_alpha = torch.sum(alpha, dim=1, keepdim=True)
-            S_beta = torch.sum(beta, dim=1, keepdim=True)
-            lnB = torch.lgamma(S_alpha) - torch.sum(torch.lgamma(alpha), dim=1, keepdim=True)
-            lnB_uni = torch.sum(torch.lgamma(beta), dim=1, keepdim=True) - torch.lgamma(S_beta)
-            dg0 = torch.digamma(S_alpha)
-            dg1 = torch.digamma(alpha)
-            kl = torch.sum((alpha - beta) * (dg1 - dg0), dim=1, keepdim=True) + lnB + lnB_uni
-            return kl
-
- 
-        def ce_loss(p, alpha, c, global_step, annealing_step):
-            S = torch.sum(alpha, dim=1, keepdim=True)
-            E = alpha - 1
-            label = F.one_hot(p, num_classes=c)
-            A = torch.sum(label * (torch.digamma(S) - torch.digamma(alpha)), dim=1, keepdim=True)
-
-            annealing_coef = min(1, global_step / annealing_step)
-
-            alp = E * (1 - label) + 1
-            B = annealing_coef * KL(alp, c)
-
-            return (A + B)
         
         # TODO change loss function
         self.criterion = torch.nn.CrossEntropyLoss(reduction='none') 
@@ -289,3 +264,91 @@ class CLUECL3(nn.Module):
         latent_fusion_train = torch.cat([latent_code_a_eval, latent_code_b_eval], dim=1)
         MMlogit = self.MMClasifier(latent_fusion_train)
         return MMlogit
+    
+
+# model for single view
+class Classifier(nn.Module):
+    def __init__(self, classifier_dims, classes):
+        super(Classifier, self).__init__()
+        self.num_layers = len(classifier_dims)
+        self.fc = nn.ModuleList()
+        for i in range(self.num_layers-1):
+            self.fc.append(nn.Linear(classifier_dims[i], classifier_dims[i+1]))
+        self.fc.append(nn.Linear(classifier_dims[self.num_layers-1], classes))
+        self.fc.append(nn.Softplus())
+
+    def forward(self, x):
+        h = self.fc[0](x)
+        for i in range(1, len(self.fc)):
+            h = self.fc[i](h)
+        return h
+
+
+
+class SingleViewData(Dataset):
+
+    def __init__(self, root, train=True, cv=0):
+        """
+        :param root: data name and path
+        :param train: load training set or test set
+        """
+        super(SingleViewData, self).__init__()
+        train = "tr" if train else "te"
+        # self.X = pd.read_csv(f"{root}/view1_{train}_x{cv}.csv").to_numpy()
+        # y = np.loadtxt(f"{root}/{train}_y_{cv}.txt")
+
+        # fix file being read
+        self.X = pd.read_csv(f"{root}/1_{train}.csv").to_numpy()
+        y = np.loadtxt(f"{root}/labels_{train}.csv")
+
+        tmp = np.zeros(y.shape[0])
+        y = np.reshape(y, np.shape(tmp))
+        self.y = y
+
+    def __getitem__(self, index):
+        data = self.X[index].astype(np.float32)
+        target = self.y[index]
+        return data, target
+
+    def __len__(self):
+        return self.X.shape[0]
+
+def one_hot_embedding(labels, num_classes=10):
+    # Convert to One Hot Encoding
+    y = torch.eye(num_classes).to(labels.device)
+    return y[labels]
+
+class EV_SV(nn.Module):
+
+    def __init__(self, classes, classifier_dims, use_uncertainty=True, loss="digamma"):
+        super(EV_SV, self).__init__()
+        self.num_classes = classes
+        self.classifier = Classifier(classifier_dims, self.num_classes)
+        
+        # types of loss functions used digamma
+        if use_uncertainty:
+            if loss == "digamma":
+                criterion = edl_digamma_loss
+            else:
+                raise ValueError("[!] not a supported loss")
+            """elif loss == "log":
+                criterion = edl_log_loss
+            elif loss == "mse":
+                criterion = edl_mse_loss"""
+            
+        else:
+            criterion = nn.CrossEntropyLoss()
+        
+        self.criterion = criterion
+        self.num_classes = classes
+    
+    def forward(self, X, y, epoch):
+        outputs = self.classifier(X)
+        y = one_hot_embedding(y, self.num_classes)
+        loss = self.criterion(outputs, y, epoch, num_classes=self.num_classes, annealing_step=50)
+
+        evidence = relu_evidence(outputs)
+        alpha = evidence + 1
+        u = self.num_classes / torch.sum(alpha, dim=1, keepdim=True)
+
+        return outputs, loss, u
