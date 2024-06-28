@@ -45,6 +45,10 @@ class CLCLSA_Trainer(object):
         # print(self.dim_list)
 
         # new
+        self.preds2, self.gts2, self.us2 = [], [], []
+
+
+
         # self.Classifiers = nn.ModuleList([Classifier(classifier_dims[i], self.num_class) for i in range(self.views)])
         self.Classifiers = nn.ModuleList([Classifier(self.dim_list[i], self.num_class) for i in range(len(self.dim_list))])
 
@@ -158,16 +162,17 @@ class CLCLSA_Trainer(object):
 
             self.scheduler.step()
             if epoch % self.params['test_inverval'] == 0:
-                te_prob = self.test_epoch()
+                te_prob, alpha_a, u_a = self.test_epoch()
                 if not np.any(np.isnan(te_prob)):
                     print("\nTest: Epoch {:d}".format(epoch))
                     if self.num_class == 2:
                         # uncertainty
-                        u_a = "work in progress"
+                        
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
                         print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty: {u_a}")
+                        print(alpha_a)
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
@@ -224,7 +229,7 @@ class CLCLSA_Trainer(object):
         # u_a is len = 153
         # TODO figure out what this represents
 
-        return prob
+        return prob, alpha_a, u_a
 
     def save_checkpoint(self, checkpoint_path, filename="checkpoint.pt"):
         os.makedirs(checkpoint_path, exist_ok=True)
@@ -246,6 +251,9 @@ class CLCLSA_Trainer(object):
         for v_num in range(views):
             evidence[v_num] = self.Classifiers[v_num](input[v_num])
         return evidence 
+    
+    def plot(self):
+        print("working")
     
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, num_class):

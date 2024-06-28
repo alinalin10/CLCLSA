@@ -37,3 +37,7 @@ if __name__ == '__main__':
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
     cl_trainer = CLCLSA_Trainer(params)
     cl_trainer.train() 
+    
+    # plot
+    cl_trainer.plot()
+    
