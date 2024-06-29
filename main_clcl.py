@@ -4,13 +4,14 @@ import os
 from networks.trainers.clcl_trainer import CLCLSA_Trainer
 
 
+    
 if __name__ == '__main__':
     # python main_clcl.py --data_folder=ROSMAP --hidden_dim=300 --num_epoch=2500
     # python main_clcl.py --data_folder=BRCA --hidden_dim=200 --num_epoch=2500
     parser = argparse.ArgumentParser()
 
     # dataset settings
-    parser.add_argument('--data_folder', type=str, default="LGG")
+    parser.add_argument('--data_folder', type=str, default="ROSMAP")
     parser.add_argument('--missing_rate', type=float, default=0.2)
     parser.add_argument('--exp', type=str, default="./exp")
 
@@ -37,3 +38,7 @@ if __name__ == '__main__':
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
     cl_trainer = CLCLSA_Trainer(params)
     cl_trainer.train() 
+
+    
+    # plot
+    cl_trainer.plot()
