@@ -179,27 +179,7 @@ class CLCLSA_Trainer(object):
                         self.us2.extend(u_a)
                         self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
                         self.preds2.extend(te_prob.argmax(1))
-                        print(len(self.us2))
-                        print(len(self.gts2))
-                        print(len(self.preds2))
-
-                        # print(self.gts2)
                         
-
-                        
-
-                        #preds2 = [list(arr) for arr in self.preds2]
-
-                        #preds2 = [tensor.item() for tensor in self.preds2]
-                        #print(preds2)
-
-                        #gts2 = [tensor.item() for tensor in self.gts2]
-                        #print(gts2)
-
-                        # ValueError: can only convert an array of size 1 to a Python scalar
-                        
-
-                        # print(alpha_a)
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
