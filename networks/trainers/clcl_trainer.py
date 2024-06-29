@@ -12,6 +12,10 @@ from networks.models.clcl import CLUECL3
 from datetime import datetime
 from tqdm import tqdm
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def get_mask_wrapper(n_views, data_len, missing_rate):
     success = False
@@ -156,7 +160,7 @@ class CLCLSA_Trainer(object):
         global_acc = 0.
         best_eval = []
         print("\nTraining...")
-        for epoch in tqdm(range(self.params['num_epoch'] + 1)):
+        for epoch in tqdm(range(self.params['num_epoch']+ 1)):
             print_loss = True if epoch % self.params['test_inverval'] == 0 else False
             self.train_epoch(print_loss)
 
@@ -171,8 +175,31 @@ class CLCLSA_Trainer(object):
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
-                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty: {u_a}")
-                        print(alpha_a)
+                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty:")
+                        self.us2.extend(u_a)
+                        self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
+                        self.preds2.extend(te_prob.argmax(1))
+                        print(len(self.us2))
+                        print(len(self.gts2))
+                        print(len(self.preds2))
+
+                        # print(self.gts2)
+                        
+
+                        
+
+                        #preds2 = [list(arr) for arr in self.preds2]
+
+                        #preds2 = [tensor.item() for tensor in self.preds2]
+                        #print(preds2)
+
+                        #gts2 = [tensor.item() for tensor in self.gts2]
+                        #print(gts2)
+
+                        # ValueError: can only convert an array of size 1 to a Python scalar
+                        
+
+                        # print(alpha_a)
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
@@ -186,8 +213,12 @@ class CLCLSA_Trainer(object):
                             global_acc = acc
                             best_eval = [acc, f1w, f1m]
                             self.save_checkpoint(exp_name)
-
+        
+        
         return best_eval, exp_name
+
+    def testing(self):
+        return self.preds2, self.gts2, self.us2
 
     def train_epoch(self, print=False):
         self.model.train()
@@ -253,7 +284,26 @@ class CLCLSA_Trainer(object):
         return evidence 
     
     def plot(self):
-        print("working")
+        us2 = [tensor.item() for tensor in self.us2]
+        preds2 = self.preds2
+        gts2 = self.gts2
+        df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
+        labels2 = []
+        print("working") 
+        for g in gts2:
+            if g:
+                labels2.append("AD")
+            else:
+                labels2.append("Normal Control")
+        df_stage2["label"] = labels2
+
+        fig, ax = plt.subplots()
+        sns.histplot(df_stage2, x="uncertainty", hue="label", element="step", ax=ax)
+        ax.set_title("Uncertainty histogram for 3 Views")
+        ax.set_xlim(0,1)
+        plt.show()
+        
+
     
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, num_class):
