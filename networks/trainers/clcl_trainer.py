@@ -52,6 +52,8 @@ class CLCLSA_Trainer(object):
         # SOLVED
         self.dim_list = [[x] for x in self.dim_list]
         # print(self.dim_list)
+        
+        self.preds2, self.gts2, self.us2 = [], [], []
 
         # new
         # self.Classifiers = nn.ModuleList([Classifier(classifier_dims[i], self.num_class) for i in range(self.views)])
@@ -200,6 +202,9 @@ class CLCLSA_Trainer(object):
                         # put auc values into an array
                         # self.auc_arr.append(auc)
                         # print(self.auc_arr)
+                        self.us2.extend(u_a)
+                        self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
+                        self.preds2.extend(te_prob.argmax(1))
                         
                         if acc > global_acc:
                             global_acc = acc
@@ -284,7 +289,24 @@ class CLCLSA_Trainer(object):
 
     # TODO plot
     def plot(self):
-        print("working")
+        us2 = [tensor.item() for tensor in self.us2]
+        preds2 = self.preds2
+        gts2 = self.gts2
+        df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
+        labels2 = []
+        print("Plotting histogram...") 
+        for g in gts2:
+            if g:
+                labels2.append("AD")
+            else:
+                labels2.append("Normal Control")
+        df_stage2["label"] = labels2
+
+        fig, ax = plt.subplots()
+        sns.histplot(df_stage2, x="uncertainty", hue="label", element="step", ax=ax)
+        ax.set_title("Uncertainty histogram for 3 Views")
+        ax.set_xlim(0,1)
+        plt.show()
         
 
 # TODO optimize EV_Trainer
