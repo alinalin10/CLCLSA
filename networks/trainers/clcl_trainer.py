@@ -15,6 +15,10 @@ from networks.models.clcl import CLUECL3
 from datetime import datetime
 from tqdm import tqdm
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def get_mask_wrapper(n_views, data_len, missing_rate):
     success = False
@@ -46,7 +50,7 @@ class CLCLSA_Trainer(object):
         # SOLVED
         self.dim_list = [[x] for x in self.dim_list]
         # print(self.dim_list)
-
+        self.preds2, self.gts2, self.us2 = [], [], []
         # new
         # self.Classifiers = nn.ModuleList([Classifier(classifier_dims[i], self.num_class) for i in range(self.views)])
         self.Classifiers = nn.ModuleList([Classifier(self.dim_list[i], self.num_class) for i in range(len(self.dim_list))])
@@ -174,12 +178,18 @@ class CLCLSA_Trainer(object):
                 if not np.any(np.isnan(te_prob)):
                     print("\nTest: Epoch {:d}".format(epoch))
                     if self.num_class == 2:
-                        # uncertainty
-                        # u_a = "work in progress"
+                    
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
                         print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty: {u_a}")
+                        
+                        self.us2.extend(u_a) 
+                        self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
+                        self.preds2.extend(te_prob.argmax(1))
+                        
+                        
+                        
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
@@ -260,6 +270,26 @@ class CLCLSA_Trainer(object):
         for v_num in range(views):
             evidence[v_num] = self.Classifiers[v_num](input[v_num])
         return evidence 
+
+    def plot(self):
+        us2 = [tensor.item() for tensor in self.us2]
+        preds2 = self.preds2
+        gts2 = self.gts2
+        df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
+        labels2 = []
+        print("Plotting...") 
+        for g in gts2:
+            if g:
+                labels2.append("AD")
+            else:
+                labels2.append("Normal Control")
+        df_stage2["label"] = labels2
+
+        fig, ax = plt.subplots()
+        sns.histplot(df_stage2, x="uncertainty", hue="label", element="step", ax=ax)
+        ax.set_title("Uncertainty histogram for 3 Views")
+        ax.set_xlim(0,1)
+        plt.show()
     
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, num_class):
@@ -277,3 +307,5 @@ class Classifier(nn.Module):
         for i in range(1, len(self.fc)):
             h = self.fc[i](h)
         return h
+    
+    
