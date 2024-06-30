@@ -33,25 +33,24 @@ if __name__ == '__main__':
     parser.add_argument('--num_epoch', type=int, default=2500)
     parser.add_argument('--test_inverval', type=int, default=50)
     # new
-    parser.add_argument('--data_path', type=str, default="ROSMAP")
-    parser.add_argument('--batch-size', type=int, default=-1, metavar='N', help='input batch size for training [default: 100]')
-    parser.add_argument('--epochs', type=int, default=3000, metavar='N', help='number of epochs to train [default: 500]')
-    parser.add_argument('--epochs_val', type=int, default=50)
-    parser.add_argument('--exp_save_path', type=str, default="exp")
+    #parser.add_argument('--data_path', type=str, default="ROSMAP")
+    #parser.add_argument('--batch-size', type=int, default=-1, metavar='N', help='input batch size for training [default: 100]')
+    #parser.add_argument('--epochs', type=int, default=3000, metavar='N', help='number of epochs to train [default: 500]')
+    #parser.add_argument('--epochs_val', type=int, default=50)
+    #parser.add_argument('--exp_save_path', type=str, default="exp")
 
     args = parser.parse_args()
     params = vars(args)
     # params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
     # params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
 
-     
     #cl_trainer = CLCLSA_Trainer(params) 
-    # cl_trainer.train()
-    # cl_trainer.plot()
+    #cl_trainer.train()
+    #cl_trainer.plot() 
 
+ 
 
-
-    """
+    
     parser_sv = argparse.ArgumentParser()
     parser_sv.add_argument('--batch-size', type=int, default=-1, metavar='N', help='input batch size for training [default: 100]')
     parser_sv.add_argument('--epochs', type=int, default=3000, metavar='N', help='number of epochs to train [default: 500]')
@@ -68,10 +67,10 @@ if __name__ == '__main__':
     args_sv = parser_sv.parse_args()
     params_sv = vars(args_sv)
     # params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
-    """
     
-    """
-    ev_trainer = EV_Trainer(args)
+    args_sv = parser_sv.parse_args()
+    
+    ev_trainer = EV_Trainer(args_sv)
 
     
 
@@ -87,8 +86,8 @@ if __name__ == '__main__':
     print(acc)
     print(preds)
     print(gts)
-    print(us)
-    """
+    print(us) 
+    
 
     # plot here
     

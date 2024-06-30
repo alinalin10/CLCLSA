@@ -20,6 +20,8 @@ import torch.optim as optim
 from torch.autograd import Variable
 import pandas as pd
 
+import seaborn as sns
+
 
 
 def get_mask_wrapper(n_views, data_len, missing_rate):
