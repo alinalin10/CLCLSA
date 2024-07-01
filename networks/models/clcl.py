@@ -267,6 +267,8 @@ class CLUECL3(nn.Module):
     
 
 # model for single view
+# NOTE this is also used for multiview
+"""
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, classes):
         super(Classifier, self).__init__()
@@ -276,6 +278,32 @@ class Classifier(nn.Module):
             self.fc.append(nn.Linear(classifier_dims[i], classifier_dims[i+1]))
         self.fc.append(nn.Linear(classifier_dims[self.num_layers-1], classes))
         self.fc.append(nn.Softplus())
+
+
+
+    def forward(self, x):
+        h = self.fc[0](x)
+        for i in range(1, len(self.fc)):
+            h = self.fc[i](h)
+        return h
+"""
+
+# trying new MLP layers:
+class Classifier(nn.Module):
+    def __init__(self, classifier_dims, classes):
+        super(Classifier, self).__init__()
+        self.num_layers = len(classifier_dims)
+        self.fc = nn.ModuleList()
+        for i in range(self.num_layers-1):
+            self.fc.append(nn.Linear(classifier_dims[i], classifier_dims[i+1]))
+            self.fc.append(nn.ReLU())
+            self.fc.append(nn.BatchNorm1d(classifier_dims[i+1]))
+            self.fc.append(nn.Dropout(0.5))
+        
+        self.fc.append(nn.Linear(classifier_dims[self.num_layers-1], classes))
+        self.fc.append(nn.Softmax(dim=1)) 
+
+
 
     def forward(self, x):
         h = self.fc[0](x)
