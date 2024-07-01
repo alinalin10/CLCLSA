@@ -182,13 +182,14 @@ class CLCLSA_Trainer(object):
                         acc = accuracy_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         f1 = f1_score(self.labels_trte[self.trte_idx["te"]], te_prob.argmax(1))
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
-                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty: {u_a}")
+                        print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty:")
                         
-                        self.us2.extend(u_a) 
+                        u_a_fixed = [tensor.item() for tensor in u_a]
+                        
+                        self.us2.extend(u_a_fixed) 
                         self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
                         self.preds2.extend(te_prob.argmax(1))
-                        
-                        
+
                         
                         if acc > global_acc:
                             global_acc = acc
@@ -243,6 +244,9 @@ class CLCLSA_Trainer(object):
         
         # using DS_Combin to obtain uncertainty and alpha_a
         alpha_a, u_a = self.DS_Combin(alpha)
+
+        u_a_fixed = [tensor.item() for tensor in u_a]
+        print(u_a_fixed)
         
         # print(len(u_a))
         # u_a is len = 153
@@ -272,7 +276,7 @@ class CLCLSA_Trainer(object):
         return evidence 
 
     def plot(self):
-        us2 = [tensor.item() for tensor in self.us2]
+        us2 = self.us2
         preds2 = self.preds2
         gts2 = self.gts2
         df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
@@ -280,14 +284,14 @@ class CLCLSA_Trainer(object):
         print("Plotting...") 
         for g in gts2:
             if g:
-                labels2.append("AD")
+                labels2.append("AD") 
             else:
                 labels2.append("Normal Control")
         df_stage2["label"] = labels2
 
         fig, ax = plt.subplots()
         sns.histplot(df_stage2, x="uncertainty", hue="label", element="step", ax=ax)
-        ax.set_title("Uncertainty histogram for 3 Views")
+        ax.set_title("Uncertainty histogram for 2 Views")
         ax.set_xlim(0,1)
         plt.show()
     
