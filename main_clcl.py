@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_inverval', type=int, default=50)
 
     args = parser.parse_args()
-    params = vars(args)
+    params = vars(args) 
     params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
     cl_trainer = CLCLSA_Trainer(params)
