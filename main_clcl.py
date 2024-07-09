@@ -10,7 +10,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # dataset settings
-    parser.add_argument('--data_folder', type=str, default="LGG")
+    parser.add_argument('--data_folder', type=str, default="ROSMAP")
     parser.add_argument('--missing_rate', type=float, default=0.2)
     parser.add_argument('--exp', type=str, default="./exp")
 

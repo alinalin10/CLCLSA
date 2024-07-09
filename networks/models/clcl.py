@@ -48,7 +48,7 @@ class CLUECL3(nn.Module):
             kl = torch.sum((alpha - beta) * (dg1 - dg0), dim=1, keepdim=True) + lnB + lnB_uni
             return kl
 
- 
+
         def ce_loss(p, alpha, c, global_step, annealing_step):
             S = torch.sum(alpha, dim=1, keepdim=True)
             E = alpha - 1
