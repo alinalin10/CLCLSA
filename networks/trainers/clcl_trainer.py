@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, confusion_m
  
  
 from utils.data_utils import one_hot_tensor, prepare_trte_data, get_mask, prepare_trte_data_with_modalities
-from networks.models.clcl import CLUECL3, Classifier, EV_SV, SingleViewData
+from networks.models.clcl import CLUECL3_2, Classifier, EV_SV, SingleViewData
 from datetime import datetime
 from tqdm import tqdm
 
@@ -42,7 +42,7 @@ class CLCLSA_Trainer(object):
         self.params = params
         self.device = self.params['device']
         self.__init_dataset__()
-        self.model = CLUECL3(self.dim_list, self.params['hidden_dim'], self.num_class, self.params['dropout'], self.params['prediction'])
+        self.model = CLUECL3_2(self.dim_list, self.params['hidden_dim'], self.num_class, self.params['dropout'], self.params['prediction'])
         # print(self.dim_list)
         # self.dim_list is [2000, 2000, 548] 
         # which is 3 views 

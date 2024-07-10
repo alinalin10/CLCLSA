@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from networks.models.common_layers import LinearLayer, Prediction
 from networks.models.losses import contrastive_Loss, edl_digamma_loss, relu_evidence
 
-class CLUECL3(nn.Module):
+class CLUECL3_2(nn.Module):
     def __init__(self, in_dim, hidden_dim, num_class, dropout, prediction_dicts):
         super().__init__()
         # assert(len(in_dim)) == 3

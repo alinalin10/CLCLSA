@@ -5,6 +5,12 @@ from networks.trainers.clcl_trainer import CLCLSA_Trainer, EV_Trainer
 
 
 if __name__ == '__main__':
+
+
+
+
+    # 2 VIEW
+    
     # python main_clcl.py --data_folder=ROSMAP --hidden_dim=300 --num_epoch=2500
     # python main_clcl.py --data_folder=BRCA --hidden_dim=200 --num_epoch=2500
     parser = argparse.ArgumentParser()
@@ -42,6 +48,9 @@ if __name__ == '__main__':
  
 
     
+
+
+    # SINGLE VIEW
     parser_sv = argparse.ArgumentParser()
     parser_sv.add_argument('--batch-size', type=int, default=-1, metavar='N', help='input batch size for training [default: 100]')
     parser_sv.add_argument('--epochs', type=int, default=3000, metavar='N', help='number of epochs to train [default: 500]')
