@@ -45,7 +45,7 @@ class CLCLSA_Trainer(object):
         self.model = CLUECL3(self.dim_list, self.params['hidden_dim'], self.num_class, self.params['dropout'], self.params['prediction'])
         # print(self.dim_list)
         # self.dim_list is [2000, 2000, 548] 
-        # which is 3 views
+        # which is 3 views 
 
         # print(self.num_class)
         # 2 num_class
@@ -324,6 +324,8 @@ class EV_Trainer:
         df_train = pd.read_csv(f"{self.params.data_path}/1_tr.csv").to_numpy()
         df_test = pd.read_csv(f"{self.params.data_path}/1_te.csv").to_numpy()
 
+        
+
         batch_size = df_train.shape[0] if self.params.batch_size == -1 else self.params.batch_size
         # self.train_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=True, cv=self.params.cv), batch_size=batch_size, shuffle=True)
         # self.test_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=False, cv=self.params.cv), batch_size=df_test.shape[0], shuffle=False)
@@ -332,10 +334,22 @@ class EV_Trainer:
         self.train_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=True, cv=0), batch_size=batch_size, shuffle=True)
         self.test_loader = torch.utils.data.DataLoader(SingleViewData(self.params.data_path, train=False, cv=0), batch_size=df_test.shape[0], shuffle=False)
 
-        # TODO issue
+        self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data_with_modalities('ROSMAP', True, ['mrna'])
+
+
+        
         self.model = EV_SV(2, [200, 244], use_uncertainty=True, loss='digamma')
         print((list(self.model.children())))
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.params.lr, weight_decay=1e-5)
+
+        dim_list = [x.shape[1] for x in self.data_tr_list]
+        self.dim_list = dim_list
+        self.dim_list = [[x] for x in self.dim_list]
+        num_class = len(np.unique(self.labels_trte))
+        self.num_class = num_class
+        self.Classifiers = nn.ModuleList([Classifier(self.dim_list[i], self.num_class) for i in range(len(self.dim_list))])
+
+
         self.model.cpu()
 
     # SOLVED matrix multiplication error (611x1000 and 11x64) 
@@ -359,6 +373,15 @@ class EV_Trainer:
         self.model.eval()
         correct_num = 0
         preds, gts, us = [], [], []
+
+
+        evidence = self.infer_evidence(self.data_test_list)
+        alpha = dict()
+        for v_num in range(len(self.data_test_list)):
+            alpha[v_num] = evidence[v_num] + 1
+        
+        alpha_a, u_a = self.DS_Combin(alpha)
+
         for batch_idx, (data, target) in enumerate(self.test_loader):
             data = Variable(data.cpu())
             with torch.no_grad():
@@ -367,11 +390,20 @@ class EV_Trainer:
                 _, predicted = torch.max(outputs, 1)
                 correct_num += (predicted == target).sum().item()
 
+                # real vals
                 gt = target.cpu().detach().numpy().tolist()
+                # predicted vals
                 predicted = predicted.cpu().detach().numpy().tolist()
+
                 preds.extend(predicted)
                 gts.extend(gt)
                 us.extend(np.squeeze(u.cpu().detach().numpy()).tolist())
+        
+ 
+
+        # return prob, alpha_a, u_a
+
+
 
         # labels = [0, 1, 2, 3, 4]
         # tn: true negative, fp: false positive, fn: false negative, tp: true positives
@@ -385,7 +417,7 @@ class EV_Trainer:
         acc = (tp + tn) / (tp + tn + fp + fn)
 
         print(f"epoch = {epoch}, AUC: {auc:0.4f}, Sen: {sen:0.4f}, Spe: {spec:0.4f}, F1: {f1:0.4f}, Acc: {acc:0.4f}")
-        return auc, sen, spec, f1, acc, preds, gts, us
+        return auc, sen, spec, f1, acc, preds, gts, us, u_a
         return res
 
  
@@ -396,7 +428,7 @@ class EV_Trainer:
             self.train_one_epoch(epoch)
 
             if epoch % self.params.epochs_val == 0:
-                auc, sen, spec, f1, acc, preds, gts, us = self.test(epoch)
+                auc, sen, spec, f1, acc, preds, gts, us, u_a = self.test(epoch)
                 if auc > global_auc:
                     global_auc = auc
                     self.save_model()
@@ -410,4 +442,54 @@ class EV_Trainer:
     def load_model(self):
         # self.model.load_state_dict(torch.load(f'{self.params.exp_save_path}/model_sv_cv{self.params.cv}.pth')) 
         self.model.load_state_dict(torch.load(f'{self.params.exp_save_path}/model_sv_cv4.pth')) 
+    
+    def infer_evidence(self, input):
+        """
+        :param input: Multi-view data
+        :return: evidence of every view
+        """
+        evidence = dict()
+        views = len(self.dim_list)
+
+        for v_num in range(views):
+            evidence[v_num] = self.Classifiers[v_num](input[v_num])
+        return evidence 
+    
+    def DS_Combin(self, alpha):
+        """
+        :param alpha: Dirichlet distribution parameters for a single view.
+        :return: Combined Dirichlet distribution parameters.
+        """
+        def DS_Combin_one(alpha1):
+            """
+            :param alpha1: Dirichlet distribution parameters of a single view
+            :return: Combined Dirichlet distribution parameters
+            """
+            b, S, E, u = dict(), dict(), dict(), dict()
+            
+            S[0] = torch.sum(alpha1, dim=1, keepdim=True)
+            E[0] = alpha1 - 1
+            b[0] = E[0] / (S[0].expand(E[0].shape))
+            
+            u[0] = self.num_class / S[0]
+
+            # calculate C (simplified as there's only one view)
+            C = torch.zeros_like(u[0])
+
+            # calculate b^a
+            b_a = b[0]
+            # calculate u^a
+            u_a = u[0]
+
+            # calculate new S
+            S_a = self.num_class / u_a
+            # calculate new e_k
+            e_a = torch.mul(b_a, S_a.expand(b_a.shape))
+            alpha_a = e_a + 1
+            
+            return alpha_a, u_a
+
+        alpha_a, u_a = DS_Combin_one(alpha[0])
+
+        return alpha_a, u_a
 

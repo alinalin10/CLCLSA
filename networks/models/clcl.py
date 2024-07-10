@@ -268,7 +268,7 @@ class CLUECL3(nn.Module):
 
 # model for single view
 # NOTE this is also used for multiview
-"""
+
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, classes):
         super(Classifier, self).__init__()
@@ -286,8 +286,9 @@ class Classifier(nn.Module):
         for i in range(1, len(self.fc)):
             h = self.fc[i](h)
         return h
-"""
 
+
+"""
 # trying new MLP layers:
 class Classifier(nn.Module):
     def __init__(self, classifier_dims, classes):
@@ -310,7 +311,7 @@ class Classifier(nn.Module):
         for i in range(1, len(self.fc)):
             h = self.fc[i](h)
         return h
-
+"""
 
 
 class SingleViewData(Dataset):
