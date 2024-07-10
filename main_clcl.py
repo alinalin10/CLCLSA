@@ -1,16 +1,14 @@
 import argparse
 import os
 
-from networks.trainers.clcl_trainer import CLCLSA_Trainer, EV_Trainer
+from networks.trainers.clcl_trainer import CLCLSA_Trainer_3, CLCLSA_Trainer_2, EV_Trainer
 
 
 if __name__ == '__main__':
 
 
+    # 3 VIEW
 
-
-    # 2 VIEW
-    
     # python main_clcl.py --data_folder=ROSMAP --hidden_dim=300 --num_epoch=2500
     # python main_clcl.py --data_folder=BRCA --hidden_dim=200 --num_epoch=2500
     parser = argparse.ArgumentParser()
@@ -26,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--step_size', type=int, default=500)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--prediction', type=str, default="64,32")
-    parser.add_argument('--device', type=str, default="cpu")
+    parser.add_argument('--device', type=str, default="cpu") # changed to cpu
 
     parser.add_argument('--lambda_cl', type=float, default=0.05)
     parser.add_argument('--lambda_co', type=float, default=0.02)
@@ -41,11 +39,49 @@ if __name__ == '__main__':
     params = vars(args)
     params['hidden_dim'] = [int(x) for x in params['hidden_dim'].split(",")]
     params['prediction'] = {i: [int(x) for x in params['prediction'].split(",")] for i in range(3)}
-    cl_trainer = CLCLSA_Trainer(params)
-    cl_trainer.train()
-    cl_trainer.plot() 
+    cl_trainer = CLCLSA_Trainer_3(params)
+    cl_trainer.train() 
+    cl_trainer.plot()
 
- 
+
+
+
+    # 2 VIEW
+
+    # python main_clcl.py --data_folder=ROSMAP --hidden_dim=300 --num_epoch=2500
+    # python main_clcl.py --data_folder=BRCA --hidden_dim=200 --num_epoch=2500
+    parser_2v = argparse.ArgumentParser()
+
+    # dataset settings
+    parser_2v.add_argument('--data_folder', type=str, default="ROSMAP")
+    parser_2v.add_argument('--missing_rate', type=float, default=0.2)
+    parser_2v.add_argument('--exp', type=str, default="./exp")
+
+    # model params
+    # originally 300
+    parser_2v.add_argument('--hidden_dim', type=str, default="300")
+    parser_2v.add_argument('--lr', type=float, default=1e-4)
+    parser_2v.add_argument('--step_size', type=int, default=500)
+    parser_2v.add_argument('--dropout', type=float, default=0.5)
+    parser_2v.add_argument('--prediction', type=str, default="64,32")
+    parser_2v.add_argument('--device', type=str, default="cpu")
+
+    parser_2v.add_argument('--lambda_cl', type=float, default=0.05)
+    parser_2v.add_argument('--lambda_co', type=float, default=0.02)
+
+    parser_2v.add_argument('--lambda_al', type=float, default=1.)
+
+    # training params
+    parser_2v.add_argument('--num_epoch', type=int, default=2500)
+    parser_2v.add_argument('--test_inverval', type=int, default=50)
+
+    args_2v = parser_2v.parse_args()
+    params_2v = vars(args_2v)
+    params_2v['hidden_dim'] = [int(x) for x in params_2v['hidden_dim'].split(",")]
+    params_2v['prediction'] = {i: [int(x) for x in params_2v['prediction'].split(",")] for i in range(3)}
+    cl_trainer_2v = CLCLSA_Trainer_2(params_2v)
+    cl_trainer_2v.train()
+    cl_trainer_2v.plot()
 
     
 
