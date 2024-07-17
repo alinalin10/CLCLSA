@@ -57,7 +57,7 @@ class CLCLSA_Trainer_3(object):
         # print(self.dim_list)
 
         # new
-        self.preds2, self.gts2, self.us2 = [], [], []
+        self.preds2, self.gts2, self.us2, self.acc = [], [], [], []
 
 
 
@@ -187,27 +187,10 @@ class CLCLSA_Trainer_3(object):
                         self.us2.extend(u_a)
                         self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
                         self.preds2.extend(te_prob.argmax(1))
-                        print(len(self.us2))
-                        print(len(self.gts2))
-                        print(len(self.preds2))
 
-                        # print(self.gts2)
-                        
+                        self.acc.append(acc)
 
-                        
 
-                        #preds2 = [list(arr) for arr in self.preds2]
-
-                        #preds2 = [tensor.item() for tensor in self.preds2]
-                        #print(preds2)
-
-                        #gts2 = [tensor.item() for tensor in self.gts2]
-                        #print(gts2)
-
-                        # ValueError: can only convert an array of size 1 to a Python scalar
-                        
-
-                        # print(alpha_a)
                         if acc > global_acc:
                             global_acc = acc
                             best_eval = [acc, f1, auc]
@@ -224,9 +207,6 @@ class CLCLSA_Trainer_3(object):
         
         
         return best_eval, exp_name
-
-    def testing(self):
-        return self.preds2, self.gts2, self.us2
 
     def train_epoch(self, print=False):
         self.model.train()
@@ -293,11 +273,14 @@ class CLCLSA_Trainer_3(object):
     
     def plot(self):
         us2 = [tensor.item() for tensor in self.us2]
+        print(us2)
+        print(f"max: {max(us2)}")
+        print(f"min: {min(us2)}")
         preds2 = self.preds2
         gts2 = self.gts2
         df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
         labels2 = []
-        print("working") 
+        print("Plotting histogram...") 
         for g in gts2:
             if g:
                 labels2.append("AD")
@@ -310,7 +293,15 @@ class CLCLSA_Trainer_3(object):
         ax.set_title("Uncertainty histogram for 3 Views")
         ax.set_xlim(0,1)
         plt.show()
-        
+    
+    def testing(self):
+        return self.preds2, self.gts2, self.us2, self.acc
+    
+
+
+
+
+
 
 class CLCLSA_Trainer_2(object):
 
@@ -332,7 +323,7 @@ class CLCLSA_Trainer_2(object):
         self.dim_list = [[x] for x in self.dim_list]
         # print(self.dim_list)
         
-        self.preds2, self.gts2, self.us2 = [], [], []
+        self.preds2, self.gts2, self.us2, self.acc = [], [], [], []
 
         # new
         # self.Classifiers = nn.ModuleList([Classifier(classifier_dims[i], self.num_class) for i in range(self.views)])
@@ -344,7 +335,7 @@ class CLCLSA_Trainer_2(object):
         # self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data(self.params['data_folder'], True)
 
         # changed to use only 2 modalities
-        self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data_with_modalities(self.params['data_folder'], True, ['mrna', 'methy'])
+        self.data_tr_list, self.data_test_list, self.trte_idx, self.labels_trte = prepare_trte_data_with_modalities(self.params['data_folder'], True, ['mrna', 'mirna'])
         self.labels_tr_tensor = torch.LongTensor(self.labels_trte[self.trte_idx["tr"]])
         num_class = len(np.unique(self.labels_trte))
         self.onehot_labels_tr_tensor = one_hot_tensor(self.labels_tr_tensor, num_class)
@@ -470,20 +461,13 @@ class CLCLSA_Trainer_2(object):
                         auc = roc_auc_score(self.labels_trte[self.trte_idx["te"]], te_prob[:, 1])
                         # took out uncertainty bc it takes alot of space to print
                         print(f"Test ACC: {acc:.5f}, F1: {f1:.5f}, AUC: {auc:.5f}, Uncertainty:")
-                        
-                        # put uncertainty values into an array instantiated in the constructor
-                        # unraveled = u_a.ravel()
-                        # mean_u_a = torch.mean(unraveled)
-                        # print(mean_u_a)
-                        # self.uncertainty_arr.append(mean_u_a)
-                        # fix mean_u_a (try checking if the full u_a is the same everytime too)
-                        # SOLVED: doing something else
-                        # put auc values into an array
-                        # self.auc_arr.append(auc)
-                        # print(self.auc_arr)
+
+
                         self.us2.extend(u_a)
                         self.gts2.extend(self.labels_trte[self.trte_idx["te"]])
                         self.preds2.extend(te_prob.argmax(1))
+                        self.acc.append(acc)
+                        
                         
                         if acc > global_acc:
                             global_acc = acc
@@ -566,9 +550,12 @@ class CLCLSA_Trainer_2(object):
             evidence[v_num] = self.Classifiers[v_num](input[v_num])
         return evidence 
 
-    # TODO plot
+
     def plot(self):
         us2 = [tensor.item() for tensor in self.us2]
+        print(us2)
+        print(f"max: {max(us2)}")
+        print(f"min: {min(us2)}")
         preds2 = self.preds2
         gts2 = self.gts2
         df_stage2 = pd.DataFrame({"uncertainty": us2, "pred": preds2, "gt": gts2})
@@ -583,9 +570,13 @@ class CLCLSA_Trainer_2(object):
 
         fig, ax = plt.subplots()
         sns.histplot(df_stage2, x="uncertainty", hue="label", element="step", ax=ax)
-        ax.set_title("Uncertainty histogram for 3 Views")
+        ax.set_title("Uncertainty histogram for 2 Views")
         ax.set_xlim(0,1)
         plt.show()
+    
+
+    def testing(self):
+        return self.preds2, self.gts2, self.us2, self.acc
         
 
 # TODO optimize EV_Trainer
@@ -625,6 +616,8 @@ class EV_Trainer:
         self.num_class = num_class
         self.Classifiers = nn.ModuleList([Classifier(self.dim_list[i], self.num_class) for i in range(len(self.dim_list))])
 
+        self.acc_list = []
+        self.u_a_list = []
 
         self.model.cpu()
 
@@ -696,7 +689,7 @@ class EV_Trainer:
         return auc, sen, spec, f1, acc, preds, gts, us, u_a
         return res
 
- 
+
     def train(self):
 
         global_auc = 0.
@@ -705,9 +698,15 @@ class EV_Trainer:
 
             if epoch % self.params.epochs_val == 0:
                 auc, sen, spec, f1, acc, preds, gts, us, u_a = self.test(epoch)
+                self.acc_list.append(acc)
+                u_a = [tensor.item() for tensor in u_a]
+                self.u_a_list.extend(u_a)
                 if auc > global_auc:
                     global_auc = auc
                     self.save_model()
+    
+    def get_lists(self):
+        return self.acc_list, self.u_a_list
 
     def save_model(self):
         if not os.path.isdir(self.params.exp_save_path):
